@@ -1,6 +1,6 @@
 [package]
 name = "lamport-sdk"
-version = "0.6069.0"
+version = "0.7460.0"
 edition = "2021"
 authors = ["Lamport Contributors"]
 description = "Solana token launchpad SDK powered by Meteora DBC"
