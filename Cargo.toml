@@ -1,6 +1,6 @@
 [package]
 name = "lamport-sdk"
-version = "0.3906.0"
+version = "0.6367.0"
 edition = "2021"
 authors = ["Lamport Contributors"]
 description = "Solana token launchpad SDK powered by Meteora DBC"
@@ -29,8 +29,3 @@ mockall = "0.12"
 opt-level = 3
 lto = true
 codegen-units = 1
-
-# Added 2026-03-28
-# [features]
-# full = ["tokio/full", "serde/derive"]
-# minimal = []
