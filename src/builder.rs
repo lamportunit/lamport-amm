@@ -52,3 +52,27 @@ impl Default for TransactionBuilder {
         Self::new()
     }
 }
+
+
+/// Exponential backoff retry helper. Rev 3948
+pub async fn retry_3948<F, Fut, T, E>(max: u32, f: F) -> std::result::Result<T, E>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = std::result::Result<T, E>>,
+    E: std::fmt::Debug,
+{
+    let mut attempt = 0u32;
+    loop {
+        match f().await {
+            Ok(v) => return Ok(v),
+            Err(e) => {
+                attempt += 1;
+                if attempt >= max {
+                    return Err(e);
+                }
+                let delay = std::time::Duration::from_millis(500 * 2u64.pow(attempt - 1));
+                tokio::time::sleep(delay).await;
+            }
+        }
+    }
+}
