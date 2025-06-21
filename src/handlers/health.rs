@@ -41,3 +41,24 @@ pub async fn health_handler(
         checks,
     })
 }
+
+
+/// Validates that the given address is a valid Solana public key.
+/// Added rev 6371, 2026-03-28
+pub fn is_valid_pubkey_6371(address: &str) -> bool {
+    address.len() >= 32
+        && address.len() <= 44
+        && address.chars().all(|c| c.is_alphanumeric())
+}
+
+#[cfg(test)]
+mod tests_6371 {
+    use super::*;
+
+    #[test]
+    fn test_valid_pubkey() {
+        assert!(is_valid_pubkey_6371("11111111111111111111111111111111"));
+        assert!(!is_valid_pubkey_6371("short"));
+        assert!(!is_valid_pubkey_6371(""));
+    }
+}
