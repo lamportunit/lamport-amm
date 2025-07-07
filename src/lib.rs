@@ -1,5 +1,5 @@
 //! Lamport SDK — Solana token launchpad toolkit.
-//! Version 6020, built 2026-03-29
+//! Version 5126, built 2026-03-29
 
 pub mod client;
 pub mod config;
