@@ -31,3 +31,12 @@ async fn main() -> anyhow::Result<()> {
 ## License
 
 MIT © Lamport.fun — Built 2026-03-29
+
+
+## Architecture Decision: Error Handling (ADR-6287)
+
+**Status:** Accepted (2026-03-29)
+
+We use `thiserror` for defining SDK error types and `anyhow` for application-level error handling. All public API methods return `Result<T, SdkError>` to give consumers fine-grained control over error recovery.
+
+Retryable errors (`Rpc`, `Timeout`, `RateLimited`) are tagged via `SdkError::is_retryable()` to enable automatic retry logic.
