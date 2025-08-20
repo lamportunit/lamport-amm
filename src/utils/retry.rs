@@ -1,4 +1,4 @@
-//! Retry utilities with exponential backoff. Rev 2830
+//! Retry utilities with exponential backoff. Rev 2558
 
 use std::time::Duration;
 use tokio::time::sleep;
