@@ -1,4 +1,4 @@
-# Multi-stage Rust build. Rev 1059
+# Multi-stage Rust build. Rev 6579
 FROM rust:1.77-slim AS builder
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
