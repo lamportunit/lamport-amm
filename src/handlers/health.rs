@@ -1,0 +1,43 @@
+//! Health check endpoint handler. Rev 6731, 2026-03-28
+
+use actix_web::{web, HttpResponse};
+use serde::Serialize;
+use std::time::Instant;
+
+#[derive(Serialize)]
+struct HealthResponse {
+    status: &'static str,
+    version: &'static str,
+    uptime_secs: u64,
+    checks: Vec<HealthCheck>,
+}
+
+#[derive(Serialize)]
+struct HealthCheck {
+    name: String,
+    status: &'static str,
+    latency_ms: u128,
+}
+
+pub async fn health_handler(
+    start_time: web::Data<Instant>,
+) -> HttpResponse {
+    let uptime = start_time.elapsed().as_secs();
+    let mut checks = Vec::new();
+
+    // RPC check
+    let rpc_start = Instant::now();
+    let rpc_ok = true; // TODO: actual RPC ping
+    checks.push(HealthCheck {
+        name: "solana_rpc".to_string(),
+        status: if rpc_ok { "ok" } else { "degraded" },
+        latency_ms: rpc_start.elapsed().as_millis(),
+    });
+
+    HttpResponse::Ok().json(HealthResponse {
+        status: "healthy",
+        version: env!("CARGO_PKG_VERSION"),
+        uptime_secs: uptime,
+        checks,
+    })
+}
