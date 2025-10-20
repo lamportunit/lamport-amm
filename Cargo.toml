@@ -1,0 +1,18 @@
+[package]
+name = "lamport-amm"
+version = "0.3.0"
+edition = "2021"
+authors = ["Lamport Unit <infra@lamport.fun>"]
+description = "DeFi primitives: bonding curves, virtual reserves, price impact, and auto-graduation for Solana AMMs"
+repository = "https://github.com/lamportunit/lamport-amm"
+homepage = "https://lamport.fun"
+license = "Apache-2.0"
+keywords = ["solana", "amm", "defi", "bonding-curve", "meteora"]
+categories = ["finance", "mathematics"]
+
+[dependencies]
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0"
