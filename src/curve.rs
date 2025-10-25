@@ -1,0 +1,381 @@
+//! Bonding curve implementations.
+//!
+//! Each curve defines the price-supply relationship for a token launch.
+//! The curve determines how the token price changes as supply is bought
+//! or sold against the virtual reserve pool.
+
+use serde::{Deserialize, Serialize};
+
+/// Supported bonding curve types.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum CurveType {
+    /// Constant-product: price = reserve_base / reserve_quote
+    /// Classic x·y = k invariant (Uniswap v2 style)
+    ConstantProduct,
+
+    /// Linear: price = base_price + slope * supply_sold
+    /// Price increases linearly with each token sold
+    Linear {
+        /// Starting price in lamports per token
+        base_price: u64,
+        /// Price increase per token sold (lamports)
+        slope: u64,
+    },
+
+    /// Exponential: price = base_price * e^(growth_rate * supply_sold / scale)
+    /// Aggressive price discovery for high-demand launches
+    Exponential {
+        /// Starting price in lamports per token
+        base_price: u64,
+        /// Growth rate numerator (scaled by 10_000 = 100%)
+        growth_rate_bps: u64,
+        /// Supply scale factor to prevent overflow
+        scale: u64,
+    },
+
+    /// Sigmoid: price = max_price / (1 + e^(-steepness * (supply - midpoint)))
+    /// S-curve with soft floor and ceiling, ideal for controlled launches
+    Sigmoid {
+        /// Maximum price ceiling (lamports)
+        max_price: u64,
+        /// Steepness of the S-curve (scaled by 10_000)
+        steepness_bps: u64,
+        /// Midpoint of the curve (supply at which price = max/2)
+        midpoint: u64,
+    },
+}
+
+/// A bonding curve engine that computes prices and swap amounts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BondingCurve {
+    /// The curve type configuration
+    pub curve_type: CurveType,
+    /// Total supply that has been sold through the curve
+    pub supply_sold: u64,
+    /// Total base tokens collected (e.g., SOL in lamports)
+    pub base_collected: u64,
+    /// Maximum supply available through the curve
+    pub max_supply: u64,
+}
+
+impl BondingCurve {
+    /// Creates a new bonding curve with the given configuration.
+    pub fn new(curve_type: CurveType, max_supply: u64) -> Self {
+        Self {
+            curve_type,
+            supply_sold: 0,
+            base_collected: 0,
+            max_supply,
+        }
+    }
+
+    /// Returns the current spot price based on the curve type and supply state.
+    ///
+    /// Price is returned in lamports per token.
+    pub fn spot_price(&self) -> u64 {
+        match self.curve_type {
+            CurveType::ConstantProduct => {
+                if self.supply_sold == 0 {
+                    return 0;
+                }
+                // price = base_collected / supply_sold
+                self.base_collected
+                    .checked_div(self.supply_sold)
+                    .unwrap_or(0)
+            }
+
+            CurveType::Linear { base_price, slope } => {
+                // price = base_price + slope * supply_sold
+                base_price.saturating_add(slope.saturating_mul(self.supply_sold))
+            }
+
+            CurveType::Exponential {
+                base_price,
+                growth_rate_bps,
+                scale,
+            } => {
+                // Approximate exponential with iterative multiplication
+                // price ≈ base_price * (1 + growth_rate)^(supply_sold / scale)
+                let iterations = self.supply_sold.checked_div(scale).unwrap_or(0);
+                let mut price = base_price as u128;
+                let multiplier = 10_000u128 + growth_rate_bps as u128;
+
+                for _ in 0..iterations.min(50) {
+                    price = price.saturating_mul(multiplier) / 10_000;
+                }
+
+                price.min(u64::MAX as u128) as u64
+            }
+
+            CurveType::Sigmoid {
+                max_price,
+                steepness_bps,
+                midpoint,
+            } => {
+                // Approximate sigmoid: price = max_price / (1 + e^(-k*(x - mid)))
+                // Using piecewise linear approximation for no_std compatibility
+                let x = self.supply_sold as i128;
+                let mid = midpoint as i128;
+                let distance = x - mid;
+                let k = steepness_bps as i128;
+
+                // Scaled sigmoid approximation: output in [0, 10000]
+                let sigmoid_scaled = if distance < -40_000 * 10_000 / k {
+                    0i128
+                } else if distance > 40_000 * 10_000 / k {
+                    10_000i128
+                } else {
+                    // Linear region approximation: 5000 + distance * k / 40000
+                    (5_000 + distance * k / 40_000).clamp(0, 10_000)
+                };
+
+                (max_price as u128 * sigmoid_scaled as u128 / 10_000) as u64
+            }
+        }
+    }
+
+    /// Calculates the cost to buy `amount` tokens at the current curve position.
+    ///
+    /// Returns `(total_cost_lamports, average_price)`.
+    pub fn quote_buy(&self, amount: u64) -> (u64, u64) {
+        if amount == 0 {
+            return (0, 0);
+        }
+
+        match self.curve_type {
+            CurveType::ConstantProduct => {
+                let price = self.spot_price().max(1);
+                let cost = (price as u128 * amount as u128) as u64;
+                (cost, price)
+            }
+
+            CurveType::Linear { base_price, slope } => {
+                // Integral of (base + slope * x) from supply to supply + amount
+                // = base * amount + slope * (amount * (2 * supply + amount - 1)) / 2
+                let s = self.supply_sold as u128;
+                let a = amount as u128;
+                let b = base_price as u128;
+                let m = slope as u128;
+
+                let cost = b * a + m * a * (2 * s + a - 1) / 2;
+                let avg = (cost / a) as u64;
+
+                (cost.min(u64::MAX as u128) as u64, avg)
+            }
+
+            CurveType::Exponential { .. } | CurveType::Sigmoid { .. } => {
+                // Numerical integration via trapezoidal rule
+                let steps = amount.min(100);
+                let step_size = amount / steps;
+                let mut total_cost: u128 = 0;
+
+                let mut sim = self.clone();
+                for _ in 0..steps {
+                    let p = sim.spot_price() as u128;
+                    total_cost += p * step_size as u128;
+                    sim.supply_sold = sim.supply_sold.saturating_add(step_size);
+                }
+
+                let avg = (total_cost / amount as u128) as u64;
+                (total_cost.min(u64::MAX as u128) as u64, avg)
+            }
+        }
+    }
+
+    /// Executes a buy of `amount` tokens. Returns total cost in lamports.
+    pub fn execute_buy(&mut self, amount: u64) -> Result<u64, CurveError> {
+        if self.supply_sold.saturating_add(amount) > self.max_supply {
+            return Err(CurveError::SupplyExhausted {
+                requested: amount,
+                available: self.max_supply.saturating_sub(self.supply_sold),
+            });
+        }
+
+        let (cost, _) = self.quote_buy(amount);
+        self.supply_sold = self.supply_sold.saturating_add(amount);
+        self.base_collected = self.base_collected.saturating_add(cost);
+
+        Ok(cost)
+    }
+
+    /// Executes a sell of `amount` tokens. Returns lamports returned.
+    pub fn execute_sell(&mut self, amount: u64) -> Result<u64, CurveError> {
+        if amount > self.supply_sold {
+            return Err(CurveError::InsufficientSupply {
+                requested: amount,
+                available: self.supply_sold,
+            });
+        }
+
+        let price = self.spot_price();
+        let refund = (price as u128 * amount as u128).min(self.base_collected as u128) as u64;
+
+        self.supply_sold = self.supply_sold.saturating_sub(amount);
+        self.base_collected = self.base_collected.saturating_sub(refund);
+
+        Ok(refund)
+    }
+
+    /// Returns the percentage of supply sold (basis points, 10000 = 100%).
+    pub fn fill_percentage_bps(&self) -> u64 {
+        if self.max_supply == 0 {
+            return 0;
+        }
+        (self.supply_sold as u128 * 10_000 / self.max_supply as u128) as u64
+    }
+
+    /// Returns whether the curve has reached maximum supply.
+    pub fn is_exhausted(&self) -> bool {
+        self.supply_sold >= self.max_supply
+    }
+}
+
+/// Errors that can occur during curve operations.
+#[derive(Debug, thiserror::Error)]
+pub enum CurveError {
+    #[error("supply exhausted: requested {requested}, available {available}")]
+    SupplyExhausted { requested: u64, available: u64 },
+
+    #[error("insufficient supply to sell: requested {requested}, available {available}")]
+    InsufficientSupply { requested: u64, available: u64 },
+
+    #[error("price overflow during calculation")]
+    PriceOverflow,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_linear_curve_pricing() {
+        let curve = BondingCurve::new(
+            CurveType::Linear {
+                base_price: 1_000_000, // 0.001 SOL
+                slope: 100,
+            },
+            1_000_000, // 1M supply
+        );
+
+        assert_eq!(curve.spot_price(), 1_000_000);
+        assert_eq!(curve.fill_percentage_bps(), 0);
+    }
+
+    #[test]
+    fn test_linear_curve_price_increases() {
+        let mut curve = BondingCurve::new(
+            CurveType::Linear {
+                base_price: 1_000,
+                slope: 1,
+            },
+            1_000_000,
+        );
+
+        let price_before = curve.spot_price();
+        curve.execute_buy(10_000).unwrap();
+        let price_after = curve.spot_price();
+
+        assert!(price_after > price_before);
+        assert_eq!(curve.supply_sold, 10_000);
+    }
+
+    #[test]
+    fn test_exponential_curve() {
+        let mut curve = BondingCurve::new(
+            CurveType::Exponential {
+                base_price: 1_000,
+                growth_rate_bps: 500, // 5% per scale unit
+                scale: 1_000,
+            },
+            100_000,
+        );
+
+        let p0 = curve.spot_price();
+        curve.supply_sold = 5_000;
+        let p1 = curve.spot_price();
+        curve.supply_sold = 10_000;
+        let p2 = curve.spot_price();
+
+        assert!(p1 > p0, "price should increase");
+        assert!(p2 > p1, "growth should accelerate");
+    }
+
+    #[test]
+    fn test_sigmoid_curve_s_shape() {
+        let mut curve = BondingCurve::new(
+            CurveType::Sigmoid {
+                max_price: 10_000_000,
+                steepness_bps: 50,
+                midpoint: 500_000,
+            },
+            1_000_000,
+        );
+
+        // Before midpoint: price < max/2
+        curve.supply_sold = 100_000;
+        let p_low = curve.spot_price();
+
+        // At midpoint: price ≈ max/2
+        curve.supply_sold = 500_000;
+        let p_mid = curve.spot_price();
+
+        // After midpoint: price > max/2
+        curve.supply_sold = 900_000;
+        let p_high = curve.spot_price();
+
+        assert!(p_low < p_mid);
+        assert!(p_mid < p_high);
+        assert!(p_high <= 10_000_000);
+    }
+
+    #[test]
+    fn test_buy_sell_roundtrip() {
+        let mut curve = BondingCurve::new(
+            CurveType::Linear {
+                base_price: 1_000,
+                slope: 1,
+            },
+            1_000_000,
+        );
+
+        let cost = curve.execute_buy(1_000).unwrap();
+        assert!(cost > 0);
+        assert_eq!(curve.supply_sold, 1_000);
+
+        let refund = curve.execute_sell(1_000).unwrap();
+        assert!(refund > 0);
+        assert_eq!(curve.supply_sold, 0);
+    }
+
+    #[test]
+    fn test_supply_exhaustion() {
+        let mut curve = BondingCurve::new(
+            CurveType::Linear {
+                base_price: 1_000,
+                slope: 0,
+            },
+            100,
+        );
+
+        assert!(curve.execute_buy(100).is_ok());
+        assert!(curve.is_exhausted());
+        assert!(curve.execute_buy(1).is_err());
+    }
+
+    #[test]
+    fn test_fill_percentage() {
+        let mut curve = BondingCurve::new(
+            CurveType::Linear {
+                base_price: 1_000,
+                slope: 0,
+            },
+            10_000,
+        );
+
+        curve.supply_sold = 5_000;
+        assert_eq!(curve.fill_percentage_bps(), 5_000); // 50%
+
+        curve.supply_sold = 10_000;
+        assert_eq!(curve.fill_percentage_bps(), 10_000); // 100%
+    }
+}
