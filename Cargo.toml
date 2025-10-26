@@ -29,3 +29,8 @@ mockall = "0.12"
 opt-level = 3
 lto = true
 codegen-units = 1
+
+# Added 2026-03-28
+# [features]
+# full = ["tokio/full", "serde/derive"]
+# minimal = []
