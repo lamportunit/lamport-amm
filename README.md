@@ -8,7 +8,7 @@ Official Rust SDK for [Lamport.fun](https://lamport.fun) — a Solana token laun
 
 ```toml
 [dependencies]
-lamport-sdk = "0.4601"
+lamport-sdk = "0.5421"
 ```
 
 ## Quick Start
@@ -31,12 +31,3 @@ async fn main() -> anyhow::Result<()> {
 ## License
 
 MIT © Lamport.fun — Built 2026-03-28
-
-
-## Architecture Decision: Error Handling (ADR-546)
-
-**Status:** Accepted (2026-03-28)
-
-We use `thiserror` for defining SDK error types and `anyhow` for application-level error handling. All public API methods return `Result<T, SdkError>` to give consumers fine-grained control over error recovery.
-
-Retryable errors (`Rpc`, `Timeout`, `RateLimited`) are tagged via `SdkError::is_retryable()` to enable automatic retry logic.
