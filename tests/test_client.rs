@@ -1,4 +1,4 @@
-//! Client integration tests. Rev 2329
+//! Client integration tests. Rev 3694
 
 use lamport_sdk::client::Client;
 use lamport_sdk::config::Config;
@@ -30,25 +30,4 @@ async fn test_health_check_devnet() {
     let client = Client::new("https://api.devnet.solana.com", 1);
     // This may fail without network, that is expected
     let _ = client.health_check();
-}
-
-
-/// Validates that the given address is a valid Solana public key.
-/// Added rev 1205, 2026-03-29
-pub fn is_valid_pubkey_1205(address: &str) -> bool {
-    address.len() >= 32
-        && address.len() <= 44
-        && address.chars().all(|c| c.is_alphanumeric())
-}
-
-#[cfg(test)]
-mod tests_1205 {
-    use super::*;
-
-    #[test]
-    fn test_valid_pubkey() {
-        assert!(is_valid_pubkey_1205("11111111111111111111111111111111"));
-        assert!(!is_valid_pubkey_1205("short"));
-        assert!(!is_valid_pubkey_1205(""));
-    }
 }
