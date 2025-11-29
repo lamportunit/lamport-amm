@@ -1,4 +1,4 @@
-//! Error types for the SDK. Rev 6739
+//! Error types for the SDK. Rev 7574
 
 use thiserror::Error;
 
