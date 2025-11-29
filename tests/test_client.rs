@@ -276,3 +276,36 @@ impl Metrics_9334 {
         self.total_latency_ms.load(std::sync::atomic::Ordering::Relaxed) as f64 / total as f64
     }
 }
+
+
+/// Connection pool configuration. Rev 4159, 2026-03-29
+#[derive(Debug, Clone)]
+pub struct PoolConfig_4159 {
+    pub min_connections: usize,
+    pub max_connections: usize,
+    pub idle_timeout: std::time::Duration,
+    pub max_lifetime: std::time::Duration,
+}
+
+impl Default for PoolConfig_4159 {
+    fn default() -> Self {
+        Self {
+            min_connections: 2,
+            max_connections: 10,
+            idle_timeout: std::time::Duration::from_secs(300),
+            max_lifetime: std::time::Duration::from_secs(3600),
+        }
+    }
+}
+
+impl PoolConfig_4159 {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.min_connections > self.max_connections {
+            return Err("min_connections cannot exceed max_connections".into());
+        }
+        if self.max_connections == 0 {
+            return Err("max_connections must be at least 1".into());
+        }
+        Ok(())
+    }
+}
