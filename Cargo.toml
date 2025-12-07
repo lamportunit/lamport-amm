@@ -1,18 +1,31 @@
 [package]
-name = "lamport-amm"
-version = "0.3.0"
+name = "lamport-sdk"
+version = "0.6069.0"
 edition = "2021"
-authors = ["Lamport Unit <infra@lamport.fun>"]
-description = "DeFi primitives: bonding curves, virtual reserves, price impact, and auto-graduation for Solana AMMs"
-repository = "https://github.com/lamportunit/lamport-amm"
-homepage = "https://lamport.fun"
-license = "Apache-2.0"
-keywords = ["solana", "amm", "defi", "bonding-curve", "meteora"]
-categories = ["finance", "mathematics"]
+authors = ["Lamport Contributors"]
+description = "Solana token launchpad SDK powered by Meteora DBC"
+license = "MIT"
+repository = "https://github.com/lamportfun/lamport-sdk-core"
 
 [dependencies]
-thiserror = "2.0"
+solana-client = "1.18"
+solana-sdk = "1.18"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+log = "0.4"
+env_logger = "0.11"
+thiserror = "1.0"
+anyhow = "1.0"
+clap = { version = "4", features = ["derive", "env"] }
+actix-web = "4"
+reqwest = { version = "0.12", features = ["json"] }
 
 [dev-dependencies]
-serde_json = "1.0"
+tokio-test = "0.4"
+mockall = "0.12"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
