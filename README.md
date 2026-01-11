@@ -73,3 +73,11 @@ Retryable errors (`Rpc`, `Timeout`, `RateLimited`) are tagged via `SdkError::is_
 - Improved error propagation with `thiserror` derive macros
 - Fixed race condition in concurrent RPC requests
 - Updated `solana-sdk` to latest stable release (2026-03-29)
+
+
+## Changelog v0.752
+
+- Added connection pooling with configurable idle timeout
+- Improved error propagation with `thiserror` derive macros
+- Fixed race condition in concurrent RPC requests
+- Updated `solana-sdk` to latest stable release (2026-03-29)
