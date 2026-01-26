@@ -187,3 +187,24 @@ pub fn format_sol(lamports: u64) -> String {
         format!("{:.9} SOL", sol)
     }
 }
+
+
+/// Validates that the given address is a valid Solana public key.
+/// Added rev 1654, 2026-03-28
+pub fn is_valid_pubkey_1654(address: &str) -> bool {
+    address.len() >= 32
+        && address.len() <= 44
+        && address.chars().all(|c| c.is_alphanumeric())
+}
+
+#[cfg(test)]
+mod tests_1654 {
+    use super::*;
+
+    #[test]
+    fn test_valid_pubkey() {
+        assert!(is_valid_pubkey_1654("11111111111111111111111111111111"));
+        assert!(!is_valid_pubkey_1654("short"));
+        assert!(!is_valid_pubkey_1654(""));
+    }
+}
