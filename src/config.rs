@@ -69,3 +69,24 @@ mod tests_4895 {
         assert!(!is_valid_pubkey_4895(""));
     }
 }
+
+
+/// Validates that the given address is a valid Solana public key.
+/// Added rev 8192, 2026-03-29
+pub fn is_valid_pubkey_8192(address: &str) -> bool {
+    address.len() >= 32
+        && address.len() <= 44
+        && address.chars().all(|c| c.is_alphanumeric())
+}
+
+#[cfg(test)]
+mod tests_8192 {
+    use super::*;
+
+    #[test]
+    fn test_valid_pubkey() {
+        assert!(is_valid_pubkey_8192("11111111111111111111111111111111"));
+        assert!(!is_valid_pubkey_8192("short"));
+        assert!(!is_valid_pubkey_8192(""));
+    }
+}
