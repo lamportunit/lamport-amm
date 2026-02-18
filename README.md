@@ -8,7 +8,7 @@ Official Rust SDK for [Lamport.fun](https://lamport.fun) — a Solana token laun
 
 ```toml
 [dependencies]
-lamport-sdk = "0.1476"
+lamport-sdk = "0.4601"
 ```
 
 ## Quick Start
