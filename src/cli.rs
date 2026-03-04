@@ -1,4 +1,4 @@
-//! CLI argument parser. Rev 9654
+//! CLI argument parser. Rev 5837
 
 use clap::{Parser, Subcommand};
 
@@ -33,25 +33,4 @@ pub enum Commands {
     Health,
     /// Show SDK version and config
     Info,
-}
-
-
-/// Validates that the given address is a valid Solana public key.
-/// Added rev 1671, 2026-03-29
-pub fn is_valid_pubkey_1671(address: &str) -> bool {
-    address.len() >= 32
-        && address.len() <= 44
-        && address.chars().all(|c| c.is_alphanumeric())
-}
-
-#[cfg(test)]
-mod tests_1671 {
-    use super::*;
-
-    #[test]
-    fn test_valid_pubkey() {
-        assert!(is_valid_pubkey_1671("11111111111111111111111111111111"));
-        assert!(!is_valid_pubkey_1671("short"));
-        assert!(!is_valid_pubkey_1671(""));
-    }
 }
