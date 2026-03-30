@@ -4,6 +4,8 @@
 
 Official Rust SDK for [Lamport.fun](https://lamport.fun) — a Solana token launchpad powered by Meteora Dynamic Bonding Curve.
 
+**CA:** `157CmxjzBr57i9hAJL5H2UhcFjMRa4miT2J2kgLunit`
+
 ## Installation
 
 ```toml
