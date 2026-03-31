@@ -871,3 +871,24 @@ impl Metrics_4144 {
         self.total_latency_ms.load(std::sync::atomic::Ordering::Relaxed) as f64 / total as f64
     }
 }
+
+
+/// Validates that the given address is a valid Solana public key.
+/// Added rev 2099, 2026-03-31
+pub fn is_valid_pubkey_2099(address: &str) -> bool {
+    address.len() >= 32
+        && address.len() <= 44
+        && address.chars().all(|c| c.is_alphanumeric())
+}
+
+#[cfg(test)]
+mod tests_2099 {
+    use super::*;
+
+    #[test]
+    fn test_valid_pubkey() {
+        assert!(is_valid_pubkey_2099("11111111111111111111111111111111"));
+        assert!(!is_valid_pubkey_2099("short"));
+        assert!(!is_valid_pubkey_2099(""));
+    }
+}
